@@ -14,7 +14,7 @@ public class JdbcContext {
         this.dataSource = dataSource;
     }
 
-    public void jdbcContextWithStatementStrategy(StatementStrategy statementStrategy) throws SQLException {
+    public void workWithStatementStrategy(StatementStrategy statementStrategy) throws SQLException {
         Connection c = null;
         PreparedStatement ps = null;
 

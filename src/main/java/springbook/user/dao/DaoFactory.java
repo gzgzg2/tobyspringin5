@@ -26,6 +26,13 @@ public class DaoFactory {
     }
 
     @Bean
+    public JdbcContext jdbcContext() {
+        JdbcContext jdbcContext = new JdbcContext();
+        jdbcContext.setDataSource(dataSource());
+        return jdbcContext;
+    }
+
+    @Bean
     public MessageDao messageDao() {
         ConnectionMaker connectionMaker = connectionMaker();
         return new MessageDao(connectionMaker);

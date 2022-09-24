@@ -12,6 +12,7 @@ import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import springbook.user.dao.JdbcContext;
 import springbook.user.dao.UserDao;
 import springbook.user.domain.User;
 
@@ -34,8 +35,14 @@ class UserDaoTest {
         정재엽 = new User("frankle", "정재엽","1234" );
         박우람 = new User("uram2","우람", "123");
 
+        SingleConnectionDataSource dataSource =
+                new SingleConnectionDataSource("jdbc:mysql://localhost/study", "uram", "qkr!dnfka12", true);
+        JdbcContext jdbcContext = new JdbcContext();
+        jdbcContext.setDataSource(dataSource);
+
         dao = new UserDao();
-        dao.setDataSource(new SingleConnectionDataSource("jdbc:mysql://localhost/study", "uram", "qkr!dnfka12", true));
+        dao.setDataSource(dataSource);
+        dao.setJdbcContext(jdbcContext);
     }
 
     @Test

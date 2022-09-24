@@ -12,29 +12,29 @@ import java.sql.SQLException;
 public class UserDao {
 
     private DataSource dataSource;
+    private JdbcContext jdbcContext;
+
+    public void setJdbcContext(JdbcContext jdbcContext) {
+        this.jdbcContext = jdbcContext;
+    }
 
     public void setDataSource(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
     public void add(User user) throws SQLException {
-        class AddStatement implements StatementStrategy {
+        StatementStrategy statementStrategy = connection -> {
+            PreparedStatement preparedStatement =
+                    connection.prepareStatement("insert into USERS(id, name, password) values(?,?,?)");
 
-            @Override
-            public PreparedStatement makePreparedStatement(Connection connection) throws SQLException {
-                PreparedStatement preparedStatement =
-                        connection.prepareStatement("insert into user(id, name, password) values(?,?,?)");
+            preparedStatement.setString(1, user.getId());
+            preparedStatement.setString(2, user.getName());
+            preparedStatement.setString(3, user.getPassword());
 
-                preparedStatement.setString(1, user.getId());
-                preparedStatement.setString(2, user.getName());
-                preparedStatement.setString(3, user.getPassword());
+            return preparedStatement;
+        };
 
-                return preparedStatement;
-            }
-        }
-
-        StatementStrategy statementStrategy = new AddStatement();
-        jdbcContextWithStatementStrategy(statementStrategy);
+        jdbcContext.workWithStatementStrategy(statementStrategy);
     }
 
     public User get(String id) throws SQLException {
@@ -63,7 +63,7 @@ public class UserDao {
 
     public void deleteAll() throws SQLException {
         StatementStrategy statementStrategy = new DeleteAllStatement();
-        jdbcContextWithStatementStrategy(statementStrategy);
+        jdbcContext.workWithStatementStrategy(statementStrategy);
     }
 
     public int getCount() throws SQLException {
@@ -82,30 +82,5 @@ public class UserDao {
         return count;
     }
 
-    public void jdbcContextWithStatementStrategy(StatementStrategy statementStrategy) throws SQLException {
-        Connection c = null;
-        PreparedStatement ps = null;
-
-        try {
-            c = dataSource.getConnection();
-
-            PreparedStatement preparedStatement = statementStrategy.makePreparedStatement(c);
-
-            preparedStatement.executeUpdate();
-        } catch (SQLException e) {
-            throw e;
-        } finally {
-            if (ps != null) {
-                try {
-                    ps.close();
-                } catch (SQLException e) {}
-            }
-            if (c != null) {
-                try {
-                    c.close();
-                } catch (SQLException e) {}
-            }
-        }
-    }
 
 }
