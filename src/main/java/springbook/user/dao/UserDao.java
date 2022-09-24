@@ -1,50 +1,111 @@
 package springbook.user.dao;
 
+import org.springframework.dao.EmptyResultDataAccessException;
 import springbook.user.domain.User;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-public abstract class UserDao {
+public class UserDao {
 
-    public static final String COM_MYSQL_JDBC_DRIVER = "com.mysql.jdbc.Driver";
+    private DataSource dataSource;
 
-    public void add(User user) throws ClassNotFoundException, SQLException {
-        Connection c = getConnection();
-
-        PreparedStatement preparedStatement = c.prepareStatement("insert into USERS(id, Name, Password) values(?,?,?) ");
-
-        preparedStatement.setString(1, user.getId());
-        preparedStatement.setString(2, user.getName());
-        preparedStatement.setString(3, user.getPassword());
-
-        preparedStatement.executeUpdate();
+    public void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
-    public User get(String id) throws ClassNotFoundException, SQLException {
-        Connection c = getConnection();
-        PreparedStatement preparedStatement = c.prepareStatement("SELECT * FROM USERS WHERE id = ?");
+    public void add(User user) throws SQLException {
+        class AddStatement implements StatementStrategy {
 
+            @Override
+            public PreparedStatement makePreparedStatement(Connection connection) throws SQLException {
+                PreparedStatement preparedStatement =
+                        connection.prepareStatement("insert into user(id, name, password) values(?,?,?)");
 
-        preparedStatement.setString(1, id);
+                preparedStatement.setString(1, user.getId());
+                preparedStatement.setString(2, user.getName());
+                preparedStatement.setString(3, user.getPassword());
 
-        ResultSet resultSet = preparedStatement.executeQuery();
-        resultSet.next();
+                return preparedStatement;
+            }
+        }
 
-        User user = new User();
-        user.setId(resultSet.getString("id"));
-        user.setName(resultSet.getString("name"));
-        user.setPassword(resultSet.getString("password"));
+        StatementStrategy statementStrategy = new AddStatement();
+        jdbcContextWithStatementStrategy(statementStrategy);
+    }
 
+    public User get(String id) throws SQLException {
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement preparedStatement = c.prepareStatement("SELECT * FROM USERS WHERE id = ?"))
+        {
+            preparedStatement.setString(1, id);
+            try(ResultSet resultSet = preparedStatement.executeQuery()) {
 
-        resultSet.close();
-        preparedStatement.close();
+                User user = null;
+
+                if (resultSet.next()) {
+                    user = new User(
+                            resultSet.getString("id"),
+                            resultSet.getString("name"),
+                            resultSet.getString("password")
+                    );
+                }
+
+                if (user == null) throw new EmptyResultDataAccessException(1);
+
+                return user;
+            }
+        }
+    }
+
+    public void deleteAll() throws SQLException {
+        StatementStrategy statementStrategy = new DeleteAllStatement();
+        jdbcContextWithStatementStrategy(statementStrategy);
+    }
+
+    public int getCount() throws SQLException {
+        Connection c = dataSource.getConnection();
+
+        PreparedStatement ps = c.prepareStatement("SELECT count(*) FROM USERS");
+
+        ResultSet rs = ps.executeQuery();
+        rs.next();
+        int count = rs.getInt(1);
+
+        rs.close();
+        ps.close();
         c.close();
-        return user;
+
+        return count;
     }
 
-    protected abstract  Connection getConnection() throws ClassNotFoundException, SQLException;
+    public void jdbcContextWithStatementStrategy(StatementStrategy statementStrategy) throws SQLException {
+        Connection c = null;
+        PreparedStatement ps = null;
+
+        try {
+            c = dataSource.getConnection();
+
+            PreparedStatement preparedStatement = statementStrategy.makePreparedStatement(c);
+
+            preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            throw e;
+        } finally {
+            if (ps != null) {
+                try {
+                    ps.close();
+                } catch (SQLException e) {}
+            }
+            if (c != null) {
+                try {
+                    c.close();
+                } catch (SQLException e) {}
+            }
+        }
+    }
+
 }
